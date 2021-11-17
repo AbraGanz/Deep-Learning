@@ -21,6 +21,7 @@ from random import randrange
 
 from modules import LinearModule, SoftMaxModule, CrossEntropyModule
 from modules import ReLUModule
+from train_mlp_numpy import accuracy
 
 
 def rel_error(x, y):
@@ -65,6 +66,20 @@ def eval_numerical_gradient_array(f, x, df, h=1e-5):
         grad[ix] = np.sum((pos - neg) * df) / (2 * h)
         it.iternext()
     return grad
+
+class TestAccuracy(unittest.TestCase):
+
+    def test_accuracy_function(self):
+        data = np.array([[0.8, 0.1, 0.1], [0.1, 0.2, 0.1]])
+        labels = np.array([0,1])
+        acc = 1
+        self.assertEqual(acc, accuracy(data, labels), "Tada!")
+
+    def test_accuracy_function2(self):
+        data = np.array([[0.8, 0.1, 0.1], [0.1, 0.2, 0.1],[0.25,0.5,0.25]])
+        labels = np.array([0,1,0])
+        acc = 2/3
+        self.assertEqual(acc, accuracy(data, labels), "Tada!")
 
 
 class TestLosses(unittest.TestCase):
@@ -147,6 +162,8 @@ class TestLayers(unittest.TestCase):
             dx_num = eval_numerical_gradient_array(lambda xx: layer.forward(xx), x, dout)
 
             self.assertLess(rel_error(dx, dx_num), rel_error_max)
+
+
 
 
 if __name__ == '__main__':

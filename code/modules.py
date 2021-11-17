@@ -17,6 +17,7 @@
 This module implements various modules of the network.
 You should fill in code into indicated sections.
 """
+import pdb
 import random
 import numpy as np
 
@@ -49,22 +50,30 @@ class LinearModule(object):
 
         #See video: https://www.youtube.com/watch?v=X5m7bC4xCLY&ab_channel=UvADeepLearningcourse
 
+
         if input_layer:
-            std = np.sqrt(1/ in_features)
+            if isinstance(out_features, list):
+                out_features = out_features[0]
+            std = np.sqrt(1/in_features)
         else:
+            if isinstance(in_features, list):
+                in_features = in_features[0]
             std = np.sqrt(2/in_features)
 
-        Bias = np.zeros_like(out_features)
-        Weights = np.random.normal(0, std, (out_features, in_features))
 
-        self.Weights = np.array(Weights)
-        self.Bias = np.array(Bias)
 
-        params = {'weight': 0, 'bias':0}
-        params['weight'] = self.Weights
-        params['bias'] = self.Bias
+        weights = np.random.normal(0, std, size = (out_features, in_features))
 
+        bias = np.zeros((1, out_features), dtype=np.float64)
+        params = {'weight': weights, 'bias': bias}
+        # pdb.set_trace()
         self.params = params
+        self.grads = {'weight': np.zeros_like(weights), 'bias': np.zeros_like(bias)}
+
+
+
+
+
 
 
 
@@ -93,6 +102,8 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+
         W = self.params['weight']
         B = self.params['bias']
         out = x @ W.T + B
@@ -123,16 +134,11 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        # May be a problem with forward?
 
-        dx = []
         dx = dout @ self.params['weight']
 
-        self.grads = {'weight':0, 'bias':0}
         self.grads['weight'] = dout.T @ self.x
         self.grads['bias'] = np.ones((1, dout.shape[0])) @ dout
-
-
 
         #######################
         # END OF YOUR CODE    #
@@ -153,7 +159,7 @@ class LinearModule(object):
         self.grads = None #Is this necessary?
         self.forw = None
         self.x = None
-        pass
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -349,10 +355,26 @@ class CrossEntropyModule(object):
         #         else:
         #             T[i][j] = 0
 
+        # One-hot encoding using indexing T[x, y] = 1
+        # Stack - convert array of indices to 1-hot encoded numpy
+
+        # Try an alternative method:
+        # T = np.zeroes_like(x)
+        # log = np.log(x)
+        # T[np.arange(log.size, y] = 1
+        # print(T)
+        # out = 1/len(y) * np.sum(-T)
+
+
 
         T = np.identity(x.shape[1])[y]
 
-        out = 1/len(y) * np.sum(-np.sum(T*np.log(x), axis = 1))
+        # SOMETHING WRONG HERE
+        out = 1/y.shape[0] * np.sum(-np.sum(T*np.log(x), axis = 1))
+
+        # pdb.set_trace()
+
+
 
         #######################
         # END OF YOUR CODE    #
@@ -387,7 +409,7 @@ class CrossEntropyModule(object):
 
 
         T = np.identity(x.shape[1])[y]
-        dx = 1/len(y) * (T / x)
+        dx = -1/len(y) * (T / (x + 1e-8))
 
 
         #######################

@@ -21,6 +21,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import pdb
+import random
+
 from modules import *
 
 
@@ -52,7 +55,14 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        LinearModule.__init__(n_inputs, n_hidden, input_layer = True)
+        # np.random.seed(42)
+        # Add in loop to create linear layers
+        # self.layers=[]
+        self.Linear = LinearModule(in_features=n_inputs, out_features=n_hidden, input_layer = True)
+        self.Linear2 = LinearModule(in_features=n_hidden, out_features=n_classes, input_layer = False)
+        self.ReLU = ReLUModule()
+        self.SoftMax = SoftMaxModule()
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -74,10 +84,12 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        x = LinearModule.forward(x)
-        x = ReLUModule.forward(x)
-        out = SoftMaxModule.forward(x)
-        self.loss = CrossEntropyModule.forward(out)
+        x = x.reshape((x.shape[0], 3072))
+        x = self.Linear.forward(x)
+        x = self.ReLU.forward(x)
+        x = self.Linear2.forward(x)
+        out = self.SoftMax.forward(x)
+
         self.forw = out
         # CrossEntropyModule.forward()  # Not sure if this needed
 
@@ -102,9 +114,10 @@ class MLP(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        dx = SoftMaxModule.backward(dout)
-        dx = ReLUModule.backward(dx)
-        dx = LinearModule.backward(dx)
+        dx = self.SoftMax.backward(dout)
+        dx = self.Linear2.backward(dx)
+        dx = self.ReLU.backward(dx)
+        dx = self.Linear.backward(dx)
         #Need to add more here? How do these affect weights etc?
 
         #######################
@@ -123,9 +136,11 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        ReLUModule.clear_cache()
-        SoftMaxModule.clear_cache()
-        LinearMOdule.clear_cache()
+        self.ReLU.clear_cache()
+        self.SoftMax.clear_cache()
+        self.Linear.clear_cache()
+        self.Linear2.clear_cache()
         #######################
         # END OF YOUR CODE    #
         #######################
+
