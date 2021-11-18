@@ -21,6 +21,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import pdb
+
 import torch.nn as nn
 from collections import OrderedDict
 
@@ -59,7 +61,76 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        super(MLP, self).__init__()
+
+        if isinstance(n_classes,list):
+            n_classes=n_classes[0]
+
+        # Initialise
+        self.ReLU = nn.ReLU()
+        self.layers = []
+
+        for i in range(len(n_hidden)+1):
+            if i == 0:
+                self.linear = nn.Linear(n_inputs, n_hidden[-1])
+                nn.init.xavier_normal_(self.linear.weight)
+                self.layers.append(self.linear)
+                if use_batch_norm:
+                    self.layers.append(self.BatchNorm1d(n_hidden[-1]))
+                self.layers.append(self.ReLU)
+            elif i == len(n_hidden):
+                self.linear = nn.Linear(n_hidden[0], n_classes)
+                nn.init.kaiming_normal_(self.linear.weight)
+                self.layers.append(self.linear)
+            else:
+                self.linear = nn.Linear(n_hidden[-i], n_hidden[-(i+1)])
+                nn.init.kaiming_normal_(self.linear.weight)
+                self.layers.append(self.linear)
+                if use_batch_norm:
+                    self.layers.append(self.BatchNorm1d(n_hidden[0]))
+                self.layers.append(self.ReLU)
+
+        self.model = nn.Sequential(*self.layers) #*layers?
+
+        # self.linear = nn.Linear(n_inputs, n_hidden)
+        # nn.init.xavier_normal_(self.linear.weight)
+        #
+        # self.linear2 = nn.Linear(n_hidden, n_classes)
+        # nn.init.kaiming_normal_(self.linear2.weight)
+
+        # self.model_512 = nn.Sequential(
+        #     nn.Linear(n_inputs, 512),
+        #     nn.BatchNorm1d(512) if use_batch_norm,
+        #     nn.ReLU(),
+        #     nn.Linear(512, 256),
+        #     nn.BatchNorm1d(256) if use_batch_norm,
+        #     nn.ReLU(),
+        #     nn.Linear(216, 128),
+        #     nn.BatchNorm1d(128) if use_batch_norm,
+        #     nn.ReLU(),
+        #     nn.Linear(128, n_classes)
+        # )
+        #
+        # self.model_256 = nn.Sequential(
+        #     nn.Linear(n_inputs, 256),
+        #     nn.BatchNorm1d(256) if use_batch_norm,
+        #     nn.ReLU(),
+        #     nn.Linear(256, 128),
+        #     nn.BatchNorm1d(128) if use_batch_norm,
+        #     nn.ReLU(),
+        #     nn.Linear(128, n_classes)
+        # )
+        #
+        # self.model_128 = nn.Sequential(
+        #     nn.Linear(n_inputs, 128),
+        #     nn.BatchNorm1d(128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, n_classes)
+        # )
+        #
+        # self.n_hidden = n_hidden
+
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -81,6 +152,33 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        x = x.reshape(x.shape[0], 3072)
+        out = self.model(x)
+
+        # if len(self.n_hidden) == 1:
+        #     out = self.model_128(x)
+        #
+        # if len(self.n_hidden) == 2:
+        #     out = self.model_256
+        #
+        # if len(self.n_hidden) == 3:
+        #     out = self.model_512
+
+        # x = x.reshape(x.shape[0], 3072)
+        # x = self.linear(x)
+        # #Batch normalisation
+        # if self.use_batch_norm:
+        #     x = self.batchnorm #Should affine be false?
+        # x = self.ReLU(x)
+        # out = self.linear2(x)
+        # # loss = self.CrossEntropy(x)
+        # self.forw = out
+        #
+        # x = x.reshape(x.shape[0], 3072)
+        # for layer in self.layers:
+        #     x = layer(x)
+
 
         #######################
         # END OF YOUR CODE    #

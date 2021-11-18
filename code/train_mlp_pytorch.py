@@ -33,6 +33,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+#DELETE LATER
+import wandb
+wandb.init(project="DL-Lab-1", entity="somniavero")
+
 
 def accuracy(predictions, targets):
     """
@@ -55,6 +59,17 @@ def accuracy(predictions, targets):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+
+    preds = torch.argmax(predictions, axis=1)
+    results = []
+    for i in range(len(preds)):
+        if preds[i] == targets[i]:
+            results.append(1)
+        else:
+            results.append(0)
+    # pdb.set_trace()
+    return sum(results) / len(results)
+
 
     #######################
     # END OF YOUR CODE    #
@@ -83,6 +98,15 @@ def evaluate_model(model, data_loader):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    model.eval() # Set model to eval mode Necessary?
+    predictions = torch.empty(size=(0,10))
+    test_labels = []
+    for testx, testy in data_loader:
+        testout = model.forward(testx)
+        predictions = torch.cat((predictions, testout), 0)
+        test_labels.append(testy)
+    test_labels = torch.cat(test_labels)
+    avg_accuracy = accuracy(predictions=predictions, targets=test_labels)
 
     #######################
     # END OF YOUR CODE    #
@@ -127,14 +151,17 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     # Set the random seeds for reproducibility
     np.random.seed(seed)
     torch.manual_seed(seed)
-    if torch.cuda.is_available():  # GPU operation have separate seed
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.determinstic = True
-        torch.backends.cudnn.benchmark = False
 
-    # Set default device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #Uncomment?
+
+    # if torch.cuda.is_available():  # GPU operation have separate seed
+    #     torch.cuda.manual_seed(seed)
+    #     torch.cuda.manual_seed_all(seed)
+    #     torch.backends.cudnn.determinstic = True
+    #     torch.backends.cudnn.benchmark = False
+
+    # # Set default device
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Loading the dataset
     cifar10 = cifar10_utils.get_cifar10(data_dir)
@@ -146,21 +173,76 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     #######################
 
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    model = MLP(n_inputs=3072, n_hidden=hidden_dims, n_classes=10)
+    loss_module = nn.CrossEntropyLoss()
+    optimiser = optim.SGD(model.parameters(), lr)
+
     # TODO: Training loop including validation
+    #Training
+    # Forward pass, backwards pass
+    for epoch in tqdm(range(epochs)):
+        accuracies = []
+        losses = []
+        val_accuracies = []
+        val_losses = []
+        predictions = torch.empty(size=(0,10))#naughty
+        labels = []
+        print('training epoch', epoch)
+        for x, y in cifar10_loader['train']:
+            # Forward Pass
+            out = model.forward(x)
+            loss = loss_module.forward(out, y)
+            losses.append(loss.item())
+
+            ## Calculate accuracies
+            acc = accuracy(out, y)
+            accuracies.append(acc)
+
+            # Backward Pass
+            model.zero_grad()  # Is this necessary? Or with .SGD.zero_grad()?
+            loss.backward()
+
+            ## Update parameters
+            optimiser.step()  # What are the params? Are they not calculated automatically?
+
+        ## Validation
+        for valx, valy in cifar10_loader['validation']:
+            valout = model.forward(valx)
+            predictions = torch.cat((predictions, valout), 0)
+            valloss = loss_module.forward(valout, valy)
+            val_losses.append(valloss.item())
+            labels.append(valy)
+        labels = torch.cat(labels)
+        valacc = accuracy(predictions=predictions, targets=labels)
+
+        ## Printing results each epoch
+        print('training loss:', np.mean(losses))
+        print('training accuracies:', np.mean(accuracies))
+        print('val accuracy:', valacc)
+        print('val loss:', np.mean(val_losses))
+
+        ## Plotting
+        wandb.log({'training loss': np.mean(losses), 'training accuracies': np.mean(accuracies),
+                   "validation loss": np.mean(val_losses), 'validation accuracies': valacc, 'Best Accuracy': 0.5})
+
     # TODO: Do optimization with the simple SGD optimizer
-    val_accuracies = ...
+         # Done in initialisation
+
     # TODO: Test best model
-    test_accuracy = ...
+    test_accuracy = evaluate_model(model, cifar10_loader['test'])
+    print('Test Accuracy:', test_accuracy)
+    wandb.run.summary["test_accuracy"] = test_accuracy
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    logging_info = {'val_accuracies': val_accuracies, 'val_losses': val_losses}
+
+    state_dict = model.state_dict()
+    torch.save(state_dict, "best_model.tar")
     #######################
     # END OF YOUR CODE    #
     #######################
 
     return model, val_accuracies, test_accuracy, logging_info
-
+#
 
 if __name__ == '__main__':
     # Command line arguments
@@ -189,6 +271,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    train(**kwargs)
+    _, _, test_accuracy, _ = train(**kwargs)
     # Feel free to add any additional functions, such as plotting of the loss curve here
+
+    wandb.config = {
+      "learning_rate": 0.001,
+      "epochs": 10,
+      "batch_size": 128,
+     'test_accuracy': test_accuracy
+    }
+
     
