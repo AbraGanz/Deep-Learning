@@ -20,6 +20,8 @@ imports if you want.
 import os
 import json
 import argparse
+import random
+
 import numpy as np
 
 import torch
@@ -34,6 +36,9 @@ from torchvision import transforms
 
 from augmentations import gaussian_noise_transform, gaussian_blur_transform, contrast_transform, jpeg_transform
 from cifar10_utils import get_train_validation_set, get_test_set
+
+import pickle
+from tqdm.auto import tqdm
 
 
 def set_seed(seed):
@@ -104,9 +109,21 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-    
+    # Initialise? When is this needed & when not?
+    # Set model to training mode
+    best_model = model
+    loss_module = nn.CrossEntropyLoss()
+
+    # Move to device
+    model = model.to(device)
+    loss_module = loss_module.to(device)
+
+    model.train()
+
     # Load the datasets
-    pass
+    cifar10_train, cifar10_val= get_train_validation_set(data_dir)
+    cifar10_loader_train = torch.utils.data.DataLoader(cifar10_train, batch_size=batch_size, shuffle=True)
+    cifar10_loader_val = torch.utils.data.DataLoader(cifar10_val, batch_size=batch_size, shuffle=True)
 
     # Initialize the optimizers and learning rate scheduler. 
     # We provide a recommend setup, which you are allowed to change if interested.
@@ -115,10 +132,80 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[90, 135], gamma=0.1)
     
     # Training loop with validation after each epoch. Save the best model, and remember to use the lr scheduler.
-    pass
-    
+    for epoch in tqdm(range(epochs)):
+        accuracies = []
+        losses = []
+        val_accuracies = []
+        val_losses = []
+        predictions = torch.empty(size=(0, 10))  # naughty
+        predictions = predictions.to(device)
+        labels = []
+        print('Training epoch', epoch)
+        for x, y in cifar10_loader_train:
+            x = x.to(device)
+            y = y.to(device)
+            x.reshape((x.shape[0], x.shape[1]*x.shape[2]*x.shape[3]))
+            # Forward Pass
+            out = model.forward(x)
+            loss = loss_module.forward(out, y)
+            losses.append(loss.item())
+
+            ## Caluclating Accuracy
+            results = []
+            train_preds = torch.argmax(out, axis=1)
+            for i in range(len(train_preds)):
+                if train_preds[i] == y[i]:
+                    results.append(1)
+                else:
+                    results.append(0)
+            accuracy = sum(results) / len(results)
+            accuracies.append(accuracy)
+
+            # Backward Pass
+            model.zero_grad()
+            loss.backward()
+
+            ## Update parameters
+            optimizer.step()
+
+            ## Validation
+        for valx, valy in cifar10_loader_val:
+            valx.reshape((valx.shape[0], valx.shape[1]*valx.shape[2]*valx.shape[3]))
+            valx = valx.to(device)
+            valy = valy.to(device)
+            valout = model.forward(valx)
+            predictions = torch.cat((predictions, valout), 0)
+            valloss = loss_module.forward(valout, valy)
+            val_losses.append(valloss.item())
+            labels.append(valy)
+        labels = torch.cat(labels)
+
+        ## Calculating Validation Accuracies
+        val_results = []
+        val_preds = torch.argmax(predictions, axis=1)
+        for i in range(len(val_preds)):
+            if val_preds[i] == labels[i]:
+                val_results.append(1)
+            else:
+                val_results.append(0)
+        valacc = sum(val_results) / len(val_results)
+        print(valacc)
+        val_accuracies.append(valacc)
+
+        #Check if better model
+        if valacc >= max(val_accuracies):
+            # best_model = deepcopy(model) #Save to disk as pt, model state dict
+            best_state_dict = model.state_dict() #???
+            torch.save(best_state_dict, checkpoint_name)
+
+
+        scheduler.step()
+
+
+
     # Load best model and return it.
-    pass
+    model.load_state_dict(torch.load(checkpoint_name))
+    model = best_model
     
     #######################
     # END OF YOUR CODE    #
@@ -144,7 +231,31 @@ def evaluate_model(model, data_loader, device):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-    pass
+    model = model.to(device)
+    model.eval()
+
+    test_predictions = torch.empty(size=(0, 10))
+    test_labels = []
+    for testx, testy in data_loader:
+        testx = testx.to(device)
+        testy = testy.to(device)
+        testx.reshape((testx.shape[0], testx.shape[1]*testx.shape[2]*testx.shape[3]))
+        testout = model.forward(testx)
+        test_predictions = torch.cat((test_predictions, testout), 0)
+        test_labels.append(testy)
+    test_labels = torch.cat(test_labels)
+
+    test_preds = torch.argmax(test_predictions, axis=1)
+    test_results = []
+    for i in range(len(test_preds)):
+        if test_preds[i] == test_labels[i]:
+            test_results.append(1)
+        else:
+            test_results.append(0)
+    accuracy =  sum(test_results) / len(test_results)
+
+
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -175,7 +286,20 @@ def test_model(model, batch_size, data_dir, device, seed):
     #######################
     set_seed(seed)
     test_results = {}
+
+    #Load data
+    cifar10_test = get_test_set(data_dir) #How to use batchsize??
+    cifar10_test_loader = torch.utils.data.DataLoader(cifar10_test, batch_size, True)
+
+
+    accuracy = evaluate_model(model, cifar10_test_loader, device)
+    test_results['base'+model] = accuracy
+
+    ## Corruption Functions?
+    # Need to corrupt data, and after each time pass it to evaluate_model
     pass
+
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -207,12 +331,25 @@ def main(model_name, lr, batch_size, epochs, data_dir, seed):
     #######################
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     set_seed(seed)
-    pass
+
+    ## Load the model
+    model = get_model(model_name)
+
+    ## Train the model if not already saved
+    # if #don't already have model:
+    train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name=model_name, device=device)
+
+    ## Test the Model
+    test_results = test_model(model, batch_size, data_dir, device, seed)
+
+    # Save test results to disk
+    # Should they be binary(file) or text(txt?) or pkl? Or sth else?
+    with open("test-results.pkl", "wb") as f:
+        pickle.dump(test_results, f, pickle.HIGHEST_PROTOCOL)
+
     #######################
     # END OF YOUR CODE    #
     #######################
-
-
 
 
 
@@ -224,11 +361,11 @@ if __name__ == '__main__':
     """
     # Command line arguments
     parser = argparse.ArgumentParser()
-    
+
     # Model hyperparameters
     parser.add_argument('--model_name', default='debug', type=str,
                         help='Name of the model to train.')
-    
+
     # Optimizer hyperparameters
     parser.add_argument('--lr', default=0.01, type=float,
                         help='Learning rate to use')
