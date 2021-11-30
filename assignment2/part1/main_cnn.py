@@ -23,6 +23,7 @@ import argparse
 import random
 
 import numpy as np
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -145,7 +146,9 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
             x = x.to(device)
             y = y.to(device)
             x.reshape((x.shape[0], x.shape[1]*x.shape[2]*x.shape[3]))
+
             # Forward Pass
+            optimizer.zero_grad()
             out = model.forward(x)
             loss = loss_module.forward(out, y)
             losses.append(loss.item())
@@ -162,7 +165,7 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
             accuracies.append(accuracy)
 
             # Backward Pass
-            model.zero_grad()
+
             loss.backward()
 
             ## Update parameters
@@ -195,18 +198,15 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
         #Check if better model
         if valacc >= max(val_accuracies):
             # best_model = deepcopy(model) #Save to disk as pt, model state dict
+            # best_model = deepcopy(model.to('cpu'))
             best_state_dict = model.state_dict() #???
             torch.save(best_state_dict, checkpoint_name)
 
-
         scheduler.step()
-
-
 
     # Load best model and return it.
     model.load_state_dict(torch.load(checkpoint_name))
     model = best_model
-    
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -235,7 +235,9 @@ def evaluate_model(model, data_loader, device):
     model.eval()
 
     test_predictions = torch.empty(size=(0, 10))
+    test_predictions = test_predictions.to(device)
     test_labels = []
+
     for testx, testy in data_loader:
         testx = testx.to(device)
         testy = testy.to(device)
@@ -253,9 +255,6 @@ def evaluate_model(model, data_loader, device):
         else:
             test_results.append(0)
     accuracy =  sum(test_results) / len(test_results)
-
-
-
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -286,19 +285,32 @@ def test_model(model, batch_size, data_dir, device, seed):
     #######################
     set_seed(seed)
     test_results = {}
+    test_results['gaussian_noise_transform' + model] = {}
+    test_results['gaussian_blur_transform' + model] = {}
+    test_results['contrast_transform' + model] = {}
+    test_results['jpeg_transform' + model] = {}
 
-    #Load data
-    cifar10_test = get_test_set(data_dir) #How to use batchsize??
-    cifar10_test_loader = torch.utils.data.DataLoader(cifar10_test, batch_size, True)
+    cifar10_test = get_test_set(data_dir)
+    cifar10_loader_test = torch.utils.data.DataLoader(cifar10_test, batch_size=batch_size, shuffle=True)
 
-
-    accuracy = evaluate_model(model, cifar10_test_loader, device)
+    # Base Accuracy
+    accuracy = evaluate_model(model, cifar10_loader_test, device)
     test_results['base'+model] = accuracy
 
-    ## Corruption Functions?
-    # Need to corrupt data, and after each time pass it to evaluate_model
-    pass
+    # Setting up dictionary of corrupted data files & list of augmentations
+    Corrupted_Data_Loader = {}
+    augmentations = [gaussian_noise_transform, gaussian_blur_transform, contrast_transform, jpeg_transform]
 
+    for augmentation in augmentations:
+        for severity in range(5):
+            corrupted_data = get_test_set(data_dir, augmentation(severity))
+            Corrupted_Data_Loader[str(augmentation) + str(severity)] = torch.utils.data.DataLoader(corrupted_data, batch_size, True)
+
+    # Applying each of the corruptions
+    for augmentation in augmentations:
+        for severity in range(5):
+            accuracy = evaluate_model(model, Corrupted_Data_Loader[str(augmentation) + str(severity)], device)
+            test_results[str(augmentation)+model][str(severity)] = accuracy
 
     #######################
     # END OF YOUR CODE    #
@@ -339,13 +351,16 @@ def main(model_name, lr, batch_size, epochs, data_dir, seed):
     # if #don't already have model:
     train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name=model_name, device=device)
 
+    ## If model already present:
+    # model.load_state_dict(torch.load(model_name))
+
     ## Test the Model
-    test_results = test_model(model, batch_size, data_dir, device, seed)
+    # test_results = test_model(model, batch_size, data_dir, device, seed)
 
     # Save test results to disk
     # Should they be binary(file) or text(txt?) or pkl? Or sth else?
-    with open("test-results.pkl", "wb") as f:
-        pickle.dump(test_results, f, pickle.HIGHEST_PROTOCOL)
+    # with open("test-results.pkl", "wb") as f:
+    #     pickle.dump(test_results, f, pickle.HIGHEST_PROTOCOL)
 
     #######################
     # END OF YOUR CODE    #
