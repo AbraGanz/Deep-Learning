@@ -110,6 +110,7 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    # TODO: Review
     # Initialise? When is this needed & when not?
     # Set model to training mode
     best_model = model
