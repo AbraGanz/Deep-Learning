@@ -27,6 +27,9 @@ from torch.utils.data import DataLoader
 from dataset import TextDataset, text_collate_fn
 from model import TextGenerationModel
 
+# Setting up tensorboard
+import tensorflow as tf
+
 
 def set_seed(seed):
     """
@@ -65,16 +68,61 @@ def train(args):
     # Load dataset
     # The data loader returns pairs of tensors (input, targets) where inputs are the
     # input characters, and targets the labels, i.e. the text shifted by one.
+
     dataset = TextDataset(args.txt_file, args.input_seq_length)
     data_loader = DataLoader(dataset, args.batch_size, 
                              shuffle=True, drop_last=True, pin_memory=True,
                              collate_fn=text_collate_fn)
+
+    device = args.device
+    args.vocabulary_size = dataset.vocabulary_size
+
     # Create model
-    model = ...
+    model = TextGenerationModel(args)
+    model = model.to(device)
+    best_model = model
     # Create optimizer
-    optimizer = ...
+    optimizer = optim.Adam
+
+    loss_module = nn.CrossEntropyLoss #Total cross entropy loss??
+    loss_module = loss_module.to(device)
+
+    losses = []
+    accuracies = []
     # Training loop
-    pass
+    for x, y in tqdm(data_loader):
+        optimizer.zero_grad() #something wrong here?
+        x = x.to(device)
+        y = y.to(device) #How do these work?
+        pred = model.forward(x)
+        loss = loss_module(pred, y)
+
+        print(loss)
+        losses.append(loss)
+
+        ## Caluclating Accuracy
+        results = [] # Seeems like this should be done outside the loop?
+        for i in range(len(pred)):
+            if pred[i] == y[i]:
+                results.append(1)
+            else:
+                results.append(0)
+        accuracy = sum(results) / len(results)
+        accuracies.append(accuracy)
+        print(accuracy)
+
+        if accuracy >= max(accuracies):
+            # best_model = deepcopy(model) #Save to disk as pt, model state dict
+            # best_model = deepcopy(model.to('cpu'))
+            best_state_dict = model.state_dict()  # ???
+            torch.save(best_state_dict, 'LSTM')
+
+        loss_module.backward()
+        optimizer.step()
+
+    ## Also make use of gradient clipping before the gradient step.
+    ## Recommendation: you might want to try out Tensorboard for logging your experiments.
+
     #######################
     # END OF YOUR CODE    #
     #######################
