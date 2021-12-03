@@ -28,8 +28,9 @@ from dataset import TextDataset, text_collate_fn
 from model import TextGenerationModel
 
 # Setting up tensorboard
-import tensorflow as tf
-
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+import random
 
 def set_seed(seed):
     """
@@ -65,6 +66,7 @@ def train(args):
     # PUT YOUR CODE HERE  #
     #######################
     set_seed(args.seed)
+    clip = args.clip_grad_norm
     # Load dataset
     # The data loader returns pairs of tensors (input, targets) where inputs are the
     # input characters, and targets the labels, i.e. the text shifted by one.
@@ -80,49 +82,88 @@ def train(args):
     # Create model
     model = TextGenerationModel(args)
     model = model.to(device)
-    best_model = model
-    # Create optimizer
-    optimizer = optim.Adam
 
-    loss_module = nn.CrossEntropyLoss #Total cross entropy loss??
+    # Create optimizer
+    optimizer = optim.Adam(model.parameters())
+
+    loss_module = nn.CrossEntropyLoss()
     loss_module = loss_module.to(device)
 
-    losses = []
-    accuracies = []
-    # Training loop
-    for x, y in tqdm(data_loader):
-        optimizer.zero_grad() #something wrong here?
-        x = x.to(device)
-        y = y.to(device) #How do these work?
-        pred = model.forward(x)
-        loss = loss_module(pred, y)
+    sentences = {}
 
-        print(loss)
-        losses.append(loss)
+    for epoch in tqdm(range(args.num_epochs)):
+        model.train()
+        losses = []
+        accuracies = []
+        results = []
+        epoch_loss = 0
+        curr_results = 0
+        num_results = 0
+        # Training loop
+        j = 0
+        for x, y in data_loader:
+            j += 1
+            model.train()
+            total_loss = 0
+            optimizer.zero_grad()
+            x = x.to(device)
+            y = y.to(device)
+            predictions = [] #Should be tensor?
+            for time in range(x.shape[0]):
+                out = model.forward(x[:time+1])
+                label = y[time][:]
+                prediction = torch.squeeze(torch.argmax(out, dim = 1)[-1, :]) #What shape will this be, and what of it do we want? Should it be argmaxed?
+                pred = torch.squeeze(out[-1, :]).T
+                predictions.append(pred)
+                loss = loss_module(pred, label) #Check y shape properly
+                total_loss += loss.item()
+                curr_results += sum((prediction == label).float())
+                # if prediction[-1] == label: #find index of prediction
+                #     results.append(1)
+                # else:
+                #     results.append(0)
 
-        ## Caluclating Accuracy
-        results = [] # Seeems like this should be done outside the loop?
-        for i in range(len(pred)):
-            if pred[i] == y[i]:
-                results.append(1)
-            else:
-                results.append(0)
-        accuracy = sum(results) / len(results)
+                #     pred = pred.permute(1,0)
+
+            # Need to have loss calculated over all predictions for backwards propagation
+            predictions = torch.stack(predictions)
+            predictions_loss = predictions.view((-1, args.vocabulary_size))
+            labels_loss = y.view((-1,))
+            loss = loss_module(predictions_loss, labels_loss)
+            # print('loss for back prop', loss)
+            # sentences[epoch] = model.sample()
+            # for i in range(len(sentences[epoch])):
+            #     sentences[epoch][i] = dataset.convert_to_string(sentences[epoch][i])
+            #     print('sentence', sentences[epoch][i])
+            loss.backward()
+            epoch_loss += total_loss
+            torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+            optimizer.step()
+            num_results += x.shape[0] * x.shape[1]
+        accuracy = curr_results/num_results
+        losses.append(epoch_loss / (30*args.batch_size))
+        print(epoch_loss / (30*args.batch_size))
         accuracies.append(accuracy)
-        print(accuracy)
-
-        if accuracy >= max(accuracies):
-            # best_model = deepcopy(model) #Save to disk as pt, model state dict
-            # best_model = deepcopy(model.to('cpu'))
-            best_state_dict = model.state_dict()  # ???
+        print('accuracy', accuracy)
+        if curr_results/num_results >= max(accuracies):
+            best_state_dict = model.state_dict()
             torch.save(best_state_dict, 'LSTM')
 
-        loss_module.backward()
-        optimizer.step()
+        writer.add_scalar("Loss/train", epoch_loss / (30*args.batch_size), epoch)
+        writer.add_scalar("Accuracy", accuracy, epoch)
 
-    ## Also make use of gradient clipping before the gradient step.
+        # Sentence Generation
+        if epoch == 1 or 5 or 20:
+            for temperature in [0, 0.5, 1.0, 2.0]:
+                sentences[epoch] = {}
+                sentences[epoch][temperature] = model.sample()
+                for i in range(len(sentences[epoch])):
+                    sentences[epoch][temperature][i] = dataset.convert_to_string(sentences[epoch][i])
+                print(sentences)
+
     ## Recommendation: you might want to try out Tensorboard for logging your experiments.
 
+    return sentences, accuracies, losses
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -148,4 +189,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Use GPU if available, else use CPU
+
     train(args)
+
+    #Plotting
+    writer.flush()
+

@@ -17,6 +17,8 @@
 import math
 import torch
 import torch.nn as nn
+import random
+from dataset import TextDataset
 
 
 class LSTM(nn.Module):
@@ -48,17 +50,24 @@ class LSTM(nn.Module):
         self.Wfh =None
         self.Wox =None
         self.Woh =None
-
         self.Whx = None
         self.Whh = None
-
-        self.h = None
+        self.Wph = None
 
         self.bg =None
         self.bi =None
         self.bf =None
         self.bo =None
         self.bh =None
+
+        self.h = None
+        self.g = None
+        self.i = None
+        self.f = None
+        self.o = None
+        self.c = None
+        self.p = None
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -80,29 +89,33 @@ class LSTM(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        # print('hidden dims:', self.hidden_dim)
+        # print('embed dims:', self.embed_dim) ##make into params
+        self.Wfx = nn.Parameter(torch.FloatTensor( self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Wgx = nn.Parameter(torch.FloatTensor( self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        # print('Wgx',self.Wgx.shape)
+        self.Wix = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Wix = nn.Parameter(torch.FloatTensor( self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Wox = nn.Parameter(torch.FloatTensor( self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
 
-        torch.FloatTensor(self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
+        self.Wgh = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Wih = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Wfh = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Woh = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Whx = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.Whh = nn.Parameter(torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
 
-        self.Wgx = torch.FloatTensor(self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Wix = torch.FloatTensor(self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Wfx = torch.FloatTensor(self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Wox = torch.FloatTensor(self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
+        self.bg = nn.Parameter(torch.zeros((self.Wgh.shape[1], 1)))
+        self.bi = nn.Parameter(torch.zeros(( self.Wih.shape[1], 1)))
+        self.bf = nn.Parameter(torch.ones(( self.Wfh.shape[1], 1)))
+        self.bo = nn.Parameter(torch.zeros(( self.Woh.shape[1], 1)))
+        self.bh = nn.Parameter(torch.zeros(( self.Whh.shape[1], 1)))
 
-        self.Wgh = torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Wih = torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Wfh = torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Woh = torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Whx = torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
-        self.Whh = torch.FloatTensor(self.hidden_dim, self.hidden_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim))
+        self.Wph = nn.Parameter(torch.FloatTensor().uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
+        self.bp = nn.Parameter(torch.zeros((self.Whh.shape[1], 1)))
 
-
-        self.h = torch.zeros((self.Wgh.shape[1], 1))
-
-        self.bg = torch.zeros((self.Wgh.shape[1], 1))
-        self.bi = torch.zeros((self.Wih.shape[1], 1))
-        self.bf = torch.ones((self.Wfh.shape[1], 1)) #Initialised with extra ones
-        self.bo = torch.zeros((self.Woh.shape[1], 1))
-        self.bh = torch.zeros((self.Whh.shape[1], 1))
+        # params = [self.Wgx, self.Wix, self.Wix, self.Wox, self.Wgh, self.Wih, self.Wfh, self.Woh, self.Whx, self.Whh, self.Wph,
+        # self.h, self.bg, self.bi, self.bf, self.bo, self.bh, self.bp]
 
         #######################
         # END OF YOUR CODE    #
@@ -113,7 +126,7 @@ class LSTM(nn.Module):
         Forward pass of LSTM.
 
         Args:
-            embeds: embedded input sequence with shape [input length, batch size, hidden dimension].
+            embeds: embedded input sequence with shape [input length, batch size, embedding size].
 
         TODO:
           Specify the LSTM calculations on the input sequence.
@@ -127,15 +140,42 @@ class LSTM(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
         X = embeds
+        device = embeds.device
+        X = X.to(device)
+
+        if len(X.shape) == 3:
+            self.h = torch.zeros((self.hidden_dim, X.shape[1]))
+            self.c = torch.zeros((self.hidden_dim, X.shape[1]))
+            outputs = torch.empty((X.shape[0], 1024, X.shape[1]), device=device)
+        else:
+            self.h = torch.zeros((self.hidden_dim, 1))
+            self.c = torch.zeros((self.hidden_dim, 1))
+            outputs = torch.empty((X.shape[0], 1024, 1), device=device)
+
+        self.h = self.h.to(device)
+        self.c = self.c.to(device)
 
 
 
-        self.g = torch.tanh(self.Wgx @ X + self.Wgh @ self.h + self.bg)
-        self.i = torch.sigmoid(self.Wix @ X + self.Wih @ self.h + self.bi)
-        self.f = torch.sigmoid(self.Wfx @ X + self.Wfh @ self.h + self.bf) #Check shapes
-        self.o = torch.sigmoid(self.Wox @ X + self.Woh @ self.h + self.bo)
-        self.c = torch.sigmoid(self.g * self.i + self.c * self.f)
-        self.h = torch.tanh(self.c) * self.o
+        for j in range(X.shape[0]):
+            x = X[j][:][:].T
+            if len(x.shape) == 1:
+                x = x.unsqueeze(-1)
+            self.g = torch.tanh(self.Wgx @ x + self.Wgh @ self.h + self.bg)
+            self.i = torch.sigmoid(self.Wix @ x + self.Wih @ self.h + self.bi)
+            self.f = torch.sigmoid(self.Wfx @ x + self.Wfh @ self.h + self.bf) #Check shapes
+            self.o = torch.sigmoid(self.Wox @ x + self.Woh @ self.h + self.bo)
+            self.c = self.g * self.i + self.c * self.f
+            self.h = torch.tanh(self.c) * self.o
+            # self.p = self.Wph @ self.LSTM_cell.h + self.bp
+
+            # torch.unsqueeze(self.h, 0)
+            outputs[j][:][:] = self.h
+        return outputs
+
+
+        # self.linear = nn.Linear(embeds.T.shape[1], embeds.T.shape[2])
+        # self.output = self.linear(self.h)
 
         #######################
         # END OF YOUR CODE    #
@@ -176,9 +216,10 @@ class TextGenerationModel(nn.Module):
         #                 (args.lstm_hidden_dim, args.lstm_hidden_dim))
         # self.bp = torch.zeros((self.Wph.shape[1], 1))
 
-        self.linear = nn.Linear(args.lstm_hidden_dim, args.lstm_hidden_dim)
+        self.linear = nn.Linear(args.lstm_hidden_dim, args.vocabulary_size)
+        # self.linear = nn.MapTable().add(nn.Linear(args.lstm_hidden_dim, args.vocabulary_size))
 
-        self.y = None
+        self.vocab_size = args.vocabulary_size
 
         #######################
         # END OF YOUR CODE    #
@@ -207,18 +248,20 @@ class TextGenerationModel(nn.Module):
         x = self.embedding(x)
 
         #Apply LSTM
-        self.LSTM_cell.forward(x)
+        # self.LSTM_cell.forward(x)
         ## Teacher forcing
-        # for j in range(x.shape[0]) #need to get right axis
-        #     self.LSTM_cell.forward(x[:j][:][:])
+        outputs = self.LSTM_cell.forward(x)
 
-        #Linearly map to vocab size
-            # self.p = self.Wph @ self.LSTM_cell.h + self.bp
-        self.p = self.linear(self.LSTM_cell.h) #But should it be applied this way? Since it is h we want to apply it to.
-        self.y = torch.softmax(self.p)
-
+    #Linearly map to vocab size
+        outputs = outputs.permute(0, 2, 1)
+        self.p = self.linear(outputs)
+        # self.y = torch.softmax(self.p, dim = 0) #Correct dim?
+        self.pred = self.p.permute(0, 2, 1)
+        # self.pred = torch.argmax(self.p, dim = 2) #Unnecessary?
+        #
         ##Teacher forcing
         # Need to take in labels?
+        return self.pred
 
         #######################
         # END OF YOUR CODE    #
@@ -242,14 +285,26 @@ class TextGenerationModel(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
         ## Generate Sentences starting with random character
-
-        if temperature==0:
-            ## argmax sampling
-            pass
+        sentences = {}
+        if temperature == 0:
+            max = torch.argmax
+            div = 1
         else:
-            ## softmax sampling
-            pass
-        ## Ignore temperature for now until everything else working
+            max = torch.softmax
+            div = temperature
+
+        for i in range(batch_size):
+            self.eval()
+            sentence = []
+            # Choose random first letter
+            sentence.append(random.randint(0, self.vocab_size))
+            # Generate sentence of length 30
+            for j in range(sample_length):
+                pred = self.forward(torch.IntTensor(sentence))
+                letter = torch.squeeze(max(pred/div, dim=1)[-1, :])
+                sentence.append(letter.item())
+            sentences[i] = sentence
+        return sentences
 
         #######################
         # END OF YOUR CODE    #
