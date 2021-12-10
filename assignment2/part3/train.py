@@ -29,6 +29,10 @@ from tqdm import tqdm
 from data import *
 from networks import *
 
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+# import wandb
+# wandb.init(project="my-test-project")
 
 def permute_indices(molecules: Batch) -> Batch:
     """permute the atoms within a molecule, but not across molecules
@@ -83,6 +87,26 @@ def compute_loss(
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    # device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    model.eval()
+    torch.no_grad()
+
+    edge_index = molecules.edge_index
+    edge_attr = molecules.edge_attr
+    batch_idx = molecules.batch
+
+    labels = get_labels(molecules)
+    # labels = labels.to(device)
+
+    if args.model == 'gnn':
+        predictions = model.forward(molecules, edge_index, edge_attr, batch_idx)
+    else:
+        # pdb.set_trace()
+        predictions = model.forward(molecules).squeeze()
+        # predictions = (out, dim=0) #What does output of network look like? Should it be this dim?
+    predictions = predictions.squeeze()
+    labels = labels.squeeze()
+    loss = criterion(predictions, labels) #Check correct sizes here (see terminal)
 
     #######################
     # END OF YOUR CODE    #
@@ -116,7 +140,18 @@ def evaluate_model(
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    num_results = 0
+    total_loss = 0
 
+    for x in data_loader:
+        if permute:
+            x = permute_indices(x) #Also need to permute y?
+        loss = compute_loss(model, x, criterion) #Does this not already take batch size into account? Need to do individually?
+        total_loss += loss
+        # pdb.set_trace()
+        num_results += x.y.shape[0] #What is correct dimension? Currently calculating batch size, but maybe should be number of batches
+
+    avg_loss = total_loss/num_results
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -183,19 +218,47 @@ def train(
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
+    model = model.to(device)
     # TODO: Initialize loss module and optimizer
-    criterion = ...
-    optimizer = ...
+    criterion = nn.MSELoss()
+    # criterion = criterion.to(device)
+    optimizer = torch.optim.Adam(model.parameters()) #Add amsgrad? #Use learning rate?
+
     # TODO: Training loop including validation, using evaluate_model
+
+    val_losses = []
+
+    for epoch in range(epochs):
+        for batch in train_dataloader:
+            batch = batch.to(device)
+            optimizer.zero_grad()
+            loss = compute_loss(model, batch, criterion)
+            # loss.requires_grad = True
+            loss.backward() #How do this?
+        val_loss = evaluate_model(model, valid_dataloader, criterion, False)
+        print('val_loss', val_loss)
+        val_losses.append(val_loss)
+        # wandb.log({'loss': val_loss})
+        if val_loss <= min(val_losses):
+            best_state_dict = model.state_dict()  # ???
+            torch.save(best_state_dict, args.model)
+
     # TODO: Do optimization, we used adam with amsgrad. (many should work)
-    val_losses = ...
+    # val_losses = ...
+        optimizer.step()
+        # scheduler.step()
+
+    model.load_state_dict(torch.load(args.model))
     # TODO: Test best model
-    test_loss = ...
+    test_loss = evaluate_model(model = model, data_loader = test_dataloader, criterion = criterion, permute = False)
+    print('test loss', test_loss)
     # TODO: Test best model against permuted indices
-    permuted_test_loss = ...
+    permuted_test_loss = evaluate_model(model = model, data_loader = test_dataloader, criterion = criterion, permute = True)
+    print('permuted loss', permuted_test_loss)
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    logging_info = {'losses:': val_losses, 'test loss': test_loss, 'permuted test loss': permuted_test_loss} #Accuracies?
 
     #######################
     # END OF YOUR CODE    #
