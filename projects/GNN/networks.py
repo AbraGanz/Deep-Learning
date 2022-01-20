@@ -45,9 +45,6 @@ class MLP(nn.Module):
         - define a simple MLP that operates on properly formatted QM9 data
         """
 
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
         # DOes this perform multinomial logisitc regression if len(n_hidden) = 0?
 
         super(MLP, self).__init__()
@@ -77,9 +74,6 @@ class MLP(nn.Module):
                 self.layers.append(self.ReLU)
 
         self.model = nn.Sequential(*self.layers)  # *layers?
-        #######################
-        # END OF YOUR CODE    #
-        #######################
 
     def forward(self, x):
         """
@@ -91,15 +85,9 @@ class MLP(nn.Module):
         Returns:
             out: outputs of the network
         """
-
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
         x = get_mlp_features(x)
         out = self.model(x)
-        #######################
-        # END OF YOUR CODE    #
-        #######################
+
         return out
 
     @property
@@ -133,12 +121,9 @@ class GNN(nn.Module):
         
         TODO: 
         - define a GNN which has the following structure: node embedding -> [ReLU -> RGCNConv -> ReLU -> MFConv] x num_convs -> Add-Pool -> Linear -> ReLU -> Linear
-        - One the data has been pooled, it may be beneficial to apply another MLP on the pooled data before predicing the output.
+        - Once the data has been pooled, it may be beneficial to apply another MLP on the pooled data before predicing the output.
         """
-
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+        
         super(GNN, self).__init__()
         #embedding
         self.node_embedding = nn.Linear(n_node_features, n_hidden)
@@ -154,9 +139,6 @@ class GNN(nn.Module):
 
         self.mlp = nn.Sequential(nn.Linear(n_hidden, n_hidden), nn.ReLU(), nn.Linear(n_hidden, n_output))
 
-        #######################
-        # END OF YOUR CODE    #
-        #######################
 
     def forward(
         self,
@@ -174,15 +156,8 @@ class GNN(nn.Module):
 
         Returns:
             prediction
-
-        TODO: implement the forward pass being careful to apply MLPs only where they are allowed!
-
-        Hint: remember to use global pooling.
         """
-
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+        
         nodes = get_node_features(x)
         edge_type = edge_attr.argmax(1)
         x = self.node_embedding(nodes)
@@ -201,9 +176,7 @@ class GNN(nn.Module):
                 x = layer(x)
         y = geom_nn.global_add_pool(x, batch=batch_idx)  # Should it be like this here?
         out = self.mlp(y)
-        #######################
-        # END OF YOUR CODE    #
-        #######################
+
         return out
 
     @property
