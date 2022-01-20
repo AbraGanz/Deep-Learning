@@ -78,15 +78,8 @@ def compute_loss(
 
     Returns:
         loss
-
-    TODO: 
-    - conditionally compute loss based on model type
-    - make sure there are no warnings / errors
     """
 
-    #######################
-    # PUT YOUR CODE HERE  #
-    #######################
     # device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     model.eval()
     torch.no_grad()
@@ -108,9 +101,6 @@ def compute_loss(
     labels = labels.squeeze()
     loss = criterion(predictions, labels) #Check correct sizes here (see terminal)
 
-    #######################
-    # END OF YOUR CODE    #
-    #######################
     return loss
 
 
@@ -128,18 +118,12 @@ def evaluate_model(
     Returns:
         avg_loss: scalar float, the average loss of the model on the dataset.
 
-    Hint: make sure to return the average loss of the whole dataset, 
-          independent of batch sizes (not all batches might be the same size).
     
     TODO: conditionally permute indices
           calculate loss
           average loss independent of batch sizes
-          make sure the model is in the correct mode
     """
 
-    #######################
-    # PUT YOUR CODE HERE  #
-    #######################
     num_results = 0
     total_loss = 0
 
@@ -152,9 +136,6 @@ def evaluate_model(
         num_results += x.y.shape[0] #What is correct dimension? Currently calculating batch size, but maybe should be number of batches
 
     avg_loss = total_loss/num_results
-    #######################
-    # END OF YOUR CODE    #
-    #######################
 
     return avg_loss
 
@@ -181,14 +162,8 @@ def train(
 
     TODO:
     - Implement the training of both the mlp and the gnn in the same function
-    - Evaluate your model on the whole validation set each epoch.
-    - After finishing training, evaluate your model that performed best on the validation set, 
-      on the whole test dataset.
-    - Integrate _all_ input arguments of this function in your training. You are allowed to add
-      additional input argument if you assign it a default value that represents the plain training
-      (e.g. '..., new_param=False')
-    
-    Hint: you can save your best model by deepcopy-ing it.
+    - Evaluate the model on the whole validation set each epoch.
+
     """
     # Set the random seeds for reproducibility
     np.random.seed(seed)
@@ -215,9 +190,6 @@ def train(
         test, batch_size=batch_size, exclude_keys=["pos", "idx", "z", "name"]
     )
 
-    #######################
-    # PUT YOUR CODE HERE  #
-    #######################
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
     model = model.to(device)
@@ -245,7 +217,7 @@ def train(
             best_state_dict = model.state_dict()  # ???
             torch.save(best_state_dict, args.model)
 
-    # TODO: Do optimization, we used adam with amsgrad. (many should work)
+    # TODO: Do optimization, used adam with amsgrad. (many should work)
     # val_losses = ...
         optimizer.step()
         # scheduler.step()
@@ -257,12 +229,9 @@ def train(
     # TODO: Test best model against permuted indices
     permuted_test_loss = evaluate_model(model = model, data_loader = test_dataloader, criterion = criterion, permute = True)
     print('permuted loss', permuted_test_loss)
-    # TODO: Add any information you might want to save for plotting
+    # TODO: Add any information to save for plotting
     logging_info = {'losses:': val_losses, 'test loss': test_loss, 'permuted test loss': permuted_test_loss} #Accuracies?
 
-    #######################
-    # END OF YOUR CODE    #
-    #######################
     return model, test_loss, permuted_test_loss, val_losses, logging_info
 
 
@@ -294,8 +263,6 @@ def main(**kwargs):
         model, **kwargs
     )
 
-    # plot the loss curve, etc. below.
-
 
 if __name__ == "__main__":
     # Command line arguments
@@ -326,7 +293,7 @@ if __name__ == "__main__":
         "--gnn_num_blocks",
         default=2,
         type=int,
-        help="Number of blocks of GNN convolutions. A block may include multiple different kinds of convolutions (see GNN comments)!",
+        help="Number of blocks of GNN convolutions. A block may include multiple different kinds of convolutions!",
     )
 
     # Optimizer hyperparameters
