@@ -55,16 +55,13 @@ def train(args):
         
     TODO:
     Create the dataset.
-    Create the model and optimizer (we recommend Adam as optimizer).
+    Create the model and optimizer (Adam).
     Define the operations for the training loop here. 
     Call the model forward function on the inputs, 
     calculate the loss with the targets and back-propagate, 
-    Also make use of gradient clipping before the gradient step.
-    Recommendation: you might want to try out Tensorboard for logging your experiments.
+    Make use of gradient clipping before the gradient step.
     """
-    #######################
-    # PUT YOUR CODE HERE  #
-    #######################
+
     set_seed(args.seed)
     clip = args.clip_grad_norm
     # Load dataset
@@ -161,12 +158,8 @@ def train(args):
                     sentences[epoch][temperature][i] = dataset.convert_to_string(sentences[epoch][i])
                 print(sentences)
 
-    ## Recommendation: you might want to try out Tensorboard for logging your experiments.
 
     return sentences, accuracies, losses
-    #######################
-    # END OF YOUR CODE    #
-    #######################
 
 
 if __name__ == "__main__":
