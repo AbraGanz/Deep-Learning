@@ -39,9 +39,7 @@ class LSTM(nn.Module):
         super(LSTM, self).__init__()
         self.hidden_dim = lstm_hidden_dim
         self.embed_dim = embedding_size
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+
         self.Wgx = None
         self.Wgh =None
         self.Wix =None
@@ -68,9 +66,6 @@ class LSTM(nn.Module):
         self.c = None
         self.p = None
 
-        #######################
-        # END OF YOUR CODE    #
-        #######################
         self.init_parameters()
 
     def init_parameters(self):
@@ -82,13 +77,11 @@ class LSTM(nn.Module):
             self.hidden_dim: hidden state dimension.
 
         TODO:
-        Initialize all your above-defined parameters,
-        with a uniform distribution with desired bounds (see exercise sheet).
+        Initialize all above-defined parameters,
+        with a uniform distribution with desired bounds.
         Also, add one (1.) to the uniformly initialized forget gate-bias.
         """
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+
         # print('hidden dims:', self.hidden_dim)
         # print('embed dims:', self.embed_dim) ##make into params
         self.Wfx = nn.Parameter(torch.FloatTensor( self.hidden_dim, self.embed_dim).uniform_(-1 / math.sqrt(self.hidden_dim), 1 / math.sqrt(self.hidden_dim)))
@@ -117,9 +110,6 @@ class LSTM(nn.Module):
         # params = [self.Wgx, self.Wix, self.Wix, self.Wox, self.Wgh, self.Wih, self.Wfh, self.Woh, self.Whx, self.Whh, self.Wph,
         # self.h, self.bg, self.bi, self.bf, self.bo, self.bh, self.bp]
 
-        #######################
-        # END OF YOUR CODE    #
-        #######################
 
     def forward(self, embeds):
         """
@@ -130,15 +120,9 @@ class LSTM(nn.Module):
 
         TODO:
           Specify the LSTM calculations on the input sequence.
-        Hint:
-        The output needs to span all time steps, (not just the last one),
-        so the output shape is [input length, batch size, hidden dimension].
+
         """
-        #
-        #
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+
         X = embeds
         device = embeds.device
         X = X.to(device)
@@ -174,18 +158,10 @@ class LSTM(nn.Module):
         return outputs
 
 
-        # self.linear = nn.Linear(embeds.T.shape[1], embeds.T.shape[2])
-        # self.output = self.linear(self.h)
-
-        #######################
-        # END OF YOUR CODE    #
-        #######################
-
-
 class TextGenerationModel(nn.Module):
     """
-    This module uses your implemented LSTM cell for text modelling.
-    It should take care of the character embedding,
+    This module uses the implemented LSTM cell for text modelling.
+    It takes care of the character embedding,
     and linearly maps the output of the LSTM to your vocabulary.
     """
     def __init__(self, args):
@@ -202,28 +178,20 @@ class TextGenerationModel(nn.Module):
         namely the embedding, the LSTM cell and the linear classifier.
         """
         super(TextGenerationModel, self).__init__()
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+
         ## Embedding
         self.embedding = nn.Embedding(args.vocabulary_size, args.embedding_size)
 
         ## LSTM
-        self.LSTM_cell = LSTM(args.lstm_hidden_dim, args.embedding_size) #How to do this?
+        self.LSTM_cell = LSTM(args.lstm_hidden_dim, args.embedding_size)
 
         ## Linear Classifier
-        # self.Wph = torch.distributions.uniform.Uniform(-1 / math.sqrt(args.lstm_hidden_dim), 1 / math.sqrt(args.lstm_hidden_dim),
-        #                 (args.lstm_hidden_dim, args.lstm_hidden_dim))
-        # self.bp = torch.zeros((self.Wph.shape[1], 1))
 
         self.linear = nn.Linear(args.lstm_hidden_dim, args.vocabulary_size)
         # self.linear = nn.MapTable().add(nn.Linear(args.lstm_hidden_dim, args.vocabulary_size))
 
         self.vocab_size = args.vocabulary_size
 
-        #######################
-        # END OF YOUR CODE    #
-        #######################
 
     def forward(self, x):
         """
@@ -237,12 +205,6 @@ class TextGenerationModel(nn.Module):
         apply the LSTM cell
         and linearly map to vocabulary size.
         """
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
-        ##Does one need to do one-hot encoding here?
-        # x = torch.nn.functional.one_hot(x, num_classes=self.vocab_size) #Not possible to use torch encoding?
-        # Don't need to with embedding function?
 
         #Embedding
         x = self.embedding(x)
@@ -255,17 +217,9 @@ class TextGenerationModel(nn.Module):
     #Linearly map to vocab size
         outputs = outputs.permute(0, 2, 1)
         self.p = self.linear(outputs)
-        # self.y = torch.softmax(self.p, dim = 0) #Correct dim?
         self.pred = self.p.permute(0, 2, 1)
-        # self.pred = torch.argmax(self.p, dim = 2) #Unnecessary?
-        #
-        ##Teacher forcing
-        # Need to take in labels?
+ 
         return self.pred
-
-        #######################
-        # END OF YOUR CODE    #
-        #######################
 
     def sample(self, batch_size=4, sample_length=30, temperature=0.):
         """
@@ -278,12 +232,10 @@ class TextGenerationModel(nn.Module):
 
         TODO:
         Generate sentences by sampling from the model, starting with a random character.
-        If the temperature is 0, the function should default to argmax sampling,
+        If the temperature is 0, the function defaults to argmax sampling,
         else to softmax sampling with specified temperature.
         """
-        #######################
-        # PUT YOUR CODE HERE  #
-        #######################
+
         ## Generate Sentences starting with random character
         sentences = {}
         if temperature == 0:
@@ -305,7 +257,3 @@ class TextGenerationModel(nn.Module):
                 sentence.append(letter.item())
             sentences[i] = sentence
         return sentences
-
-        #######################
-        # END OF YOUR CODE    #
-        #######################
